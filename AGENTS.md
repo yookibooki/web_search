@@ -16,8 +16,10 @@ Everything else must come from `std` — no `reqwest`, no `anyhow`, no `thiserro
 ## HTTP calls
 
 - **Must** use `std::process::Command` to spawn `curl`. Never add an HTTP crate.
-- Args: `-s -X POST https://api.langsearch.com/v1/web-search -H "Authorization: Bearer $LANGSEARCH_API_KEY" -H "Content-Type: application/json" -d '{...}' --max-time 30`
+- **`web_search` tool**: `-s -X POST https://api.langsearch.com/v1/web-search -H "Authorization: Bearer $LANGSEARCH_API_KEY" -H "Content-Type: application/json" -d '{...}' --max-time 30`
+- **`web_fetch` tool**: `curl --no-progress-meter -L --max-time 30 <url>` piped into `html2markdown --domain=<url> --plugin-table --opt-table-header-promotion --opt-table-cell-padding-behavior minimal --opt-table-skip-empty-rows` then post-processed in Rust (strip `[]()` empty links, `[hide]()` links, collapse blank lines).
 - API key from `LANGSEARCH_API_KEY` environment variable.
+- `html2markdown` is a system binary (Go-based HTML-to-Markdown converter) installed alongside `web_search`. Not a Rust crate.
 - If `curl` fails or returns non-JSON → `isError: true` with error text.
 
 ## MCP protocol
@@ -28,8 +30,8 @@ Handle exactly these methods:
 |---|---|
 | `initialize` | `{"protocolVersion":"2025-03-26","capabilities":{"tools":{}},"serverInfo":{"name":"web_search","version":"1.0.0"}}` |
 | `notifications/initialized` | No response (skip if `id` is `None`) |
-| `tools/list` | Single tool `web_search` with `inputSchema` — no `description` fields anywhere |
-| `tools/call` | Validate tool name, call HTTP endpoint, return results |
+| `tools/list` | Two tools `web_search` and `web_fetch` with `inputSchema` — no `description` fields anywhere |
+| `tools/call` | Validate tool name, dispatch to search or fetch, return results |
 | anything else | JSON-RPC error `-32601` "method not found" |
 
 ### Tool schema (`web_search`)
@@ -51,6 +53,21 @@ Handle exactly these methods:
 ```
 
 No `description` field on any property or on the tool itself — minimizes token usage in the system prompt.
+
+### Tool schema (`web_fetch`)
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "url": { "type": "string" }
+  },
+  "required": ["url"],
+  "additionalProperties": false
+}
+```
+
+No `description` fields. Same rule applies.
 
 ## Output formatting
 
@@ -88,18 +105,23 @@ No `description` field on any property or on the tool itself — minimizes token
 - `install.sh` — POSIX sh, detects Linux/macOS + arch, downloads from GitHub releases.
   - Linux: installs to `~/.local/bin/web_search`
   - macOS: installs to `/usr/local/bin/web_search`
+  - Supports x86_64, aarch64/arm64, i686/i386 on Linux; x86_64 and arm64 on macOS.
 - `install.ps1` — PowerShell, detects Windows arch, downloads from GitHub releases, installs to `%LOCALAPPDATA%\Microsoft\WindowsApps\web_search.exe` (already in PATH).
-- Both accept `VERSION` env var (defaults to `v0.1.0`).
-- Download URL pattern: `https://github.com/yookibooki/web_search/releases/download/${VERSION}/web_search-${TARGET}`.
+  - Supports x86_64, ARM64, i686/i386.
+- Both scripts also download and extract `html2markdown` binary from `JohannesKaufmann/html-to-markdown` releases alongside `web_search`.
+- Both accept `VERSION` env var (defaults to `v0.1.0`) and `HTML2MARKDOWN_VERSION` env var (defaults to `v2.5.2`).
+- Download URL patterns:
+  - `https://github.com/yookibooki/web_search/releases/download/${VERSION}/web_search-${TARGET}`
+  - `https://github.com/JohannesKaufmann/html-to-markdown/releases/download/${HTML2MARKDOWN_VERSION}/html-to-markdown_${VERSION_NO_V}_${HTML_TARGET}.tar.gz` (`.zip` on Windows)
 
 ## Release workflow (`.github/workflows/releaser.yml`)
 
 - Trigger: push tag `v*`.
 - **3 build jobs** — `build-linux` (ubuntu-24.04), `build-macos` (macos-latest), `build-windows` (windows-latest) — each runs in parallel.
-- Each job builds its **native** target and **cross-compiles** one additional target:
-  - Linux: `x86_64-unknown-linux-gnu` (native) + `aarch64-unknown-linux-gnu` (cross)
+- Each job builds its **native** target and **cross-compiles** two additional targets:
+  - Linux: `x86_64-unknown-linux-gnu` (native) + `aarch64-unknown-linux-gnu` + `i686-unknown-linux-gnu` (cross)
   - macOS: `aarch64-apple-darwin` (native) + `x86_64-apple-darwin` (cross)
-  - Windows: `x86_64-pc-windows-msvc` (native) + `aarch64-pc-windows-msvc` (cross)
+  - Windows: `x86_64-pc-windows-msvc` (native) + `aarch64-pc-windows-msvc` + `i686-pc-windows-msvc` (cross)
 - Uses `Swatinem/rust-cache@v2` for dependency caching.
 - Binary renamed to `web_search-{target}{.ext}` before upload.
 - Separate `release` job collects all artifacts and publishes via `softprops/action-gh-release@v3`.
@@ -113,3 +135,4 @@ No `description` field on any property or on the tool itself — minimizes token
 - Do not change the URL cleaning logic.
 - Do not switch to a different API endpoint.
 - Do not add optional dependencies or feature flags.
+- Do not replace `html2markdown` with a Rust crate — it must remain a system binary invoked via `Command`.

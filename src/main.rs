@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::io::{self, BufRead, Write};
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 #[derive(Deserialize)]
 struct RpcRequest { id: Option<Value>, method: String, #[serde(default)] params: Option<Value> }
@@ -22,6 +22,9 @@ struct ToolCallParams { name: String, #[serde(default)] arguments: Option<Value>
 
 #[derive(Deserialize)]
 struct SearchArgs { query: String, #[serde(default)] freshness: Option<String> }
+
+#[derive(Deserialize)]
+struct FetchArgs { url: String }
 
 #[derive(Deserialize)]
 struct ApiResponse { data: ApiData }
@@ -51,6 +54,17 @@ fn input_schema() -> Value {
     })
 }
 
+fn web_fetch_input_schema() -> Value {
+    serde_json::json!({
+        "type": "object",
+        "properties": {
+            "url": { "type": "string" }
+        },
+        "required": ["url"],
+        "additionalProperties": false
+    })
+}
+
 fn clean_url(url: &str) -> String {
     url.strip_prefix("https://").or_else(|| url.strip_prefix("http://")).unwrap_or(url)
         .trim_end_matches('/').to_string()
@@ -69,10 +83,18 @@ fn handle_call_tool(params: Option<&Value>) -> Value {
         Some(p) => p,
         None => return serde_json::json!({"isError": true, "content": [{"type": "text", "text": "invalid params"}]}),
     };
-    if call.name != "web_search" {
-        return serde_json::json!({"isError": true, "content": [{"type": "text", "text": format!("unknown tool: {}", call.name)}]});
+    match call.name.as_str() {
+        "web_search" => handle_web_search(call.arguments),
+        "web_fetch" => handle_web_fetch(call.arguments),
+        _ => {
+            let msg = format!("unknown tool: {}", call.name);
+            serde_json::json!({"isError": true, "content": [{"type": "text", "text": msg}]})
+        },
     }
-    let search: SearchArgs = call.arguments.and_then(|a| serde_json::from_value(a).ok())
+}
+
+fn handle_web_search(arguments: Option<Value>) -> Value {
+    let search: SearchArgs = arguments.and_then(|a| serde_json::from_value(a).ok())
         .unwrap_or(SearchArgs { query: String::new(), freshness: None });
     let freshness = search.freshness.unwrap_or_else(|| "noLimit".to_string());
     let api_key = std::env::var("LANGSEARCH_API_KEY").unwrap_or_default();
@@ -102,6 +124,121 @@ fn handle_call_tool(params: Option<&Value>) -> Value {
     serde_json::json!({ "content": [{"type": "text", "text": lines.join("\n")}] })
 }
 
+fn handle_web_fetch(arguments: Option<Value>) -> Value {
+    let fetch: FetchArgs = match arguments.and_then(|a| serde_json::from_value(a).ok()) {
+        Some(f) => f,
+        None => return serde_json::json!({"isError": true, "content": [{"type": "text", "text": "invalid params"}]}),
+    };
+    let url = fetch.url;
+
+    let mut curl = match Command::new("curl")
+        .args(["--no-progress-meter", "-L", "--max-time", "30", &url])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+    {
+        Ok(c) => c,
+        Err(e) => return serde_json::json!({"isError": true, "content": [{"type": "text", "text": e.to_string()}]}),
+    };
+
+    let curl_stdout = curl.stdout.take().unwrap();
+
+    let html2md = match Command::new("html2markdown")
+        .args([
+            "--domain", &url,
+            "--plugin-table",
+            "--opt-table-header-promotion",
+            "--opt-table-cell-padding-behavior", "minimal",
+            "--opt-table-skip-empty-rows",
+        ])
+        .stdin(curl_stdout)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+    {
+        Ok(h) => h,
+        Err(e) => return serde_json::json!({"isError": true, "content": [{"type": "text", "text": e.to_string()}]}),
+    };
+
+    let output = match html2md.wait_with_output() {
+        Ok(o) => o,
+        Err(e) => return serde_json::json!({"isError": true, "content": [{"type": "text", "text": e.to_string()}]}),
+    };
+
+    let curl_ok = match curl.wait() {
+        Ok(s) => s.success(),
+        Err(_) => false,
+    };
+    if !curl_ok {
+        let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
+        let msg = if stderr.is_empty() { "curl request failed".to_string() } else { stderr };
+        return serde_json::json!({"isError": true, "content": [{"type": "text", "text": msg}]});
+    }
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
+        return serde_json::json!({"isError": true, "content": [{"type": "text", "text": stderr}]});
+    }
+
+    let text = String::from_utf8_lossy(&output.stdout).into_owned();
+    let cleaned = clean_markdown(&text);
+    serde_json::json!({ "content": [{"type": "text", "text": cleaned}] })
+}
+
+fn clean_markdown(text: &str) -> String {
+    let mut result = String::with_capacity(text.len());
+    let mut prev_blank = false;
+
+    for line in text.lines() {
+        let line = strip_noise_links(line);
+        let trimmed = line.trim();
+
+        // Collapse consecutive blank lines
+        if trimmed.is_empty() {
+            if prev_blank {
+                continue;
+            }
+            prev_blank = true;
+        } else {
+            prev_blank = false;
+        }
+
+        result.push_str(&line);
+        result.push('\n');
+    }
+
+    result
+}
+
+fn strip_noise_links(text: &str) -> String {
+    let mut result = String::with_capacity(text.len());
+    let mut rest = text;
+
+    while !rest.is_empty() {
+        // Strip empty link []()
+        if rest.starts_with("[](") {
+            if let Some(end) = rest[3..].find(')') {
+                rest = &rest[3 + end + 1..];
+                continue;
+            }
+        }
+
+        // Strip [hide]() link
+        if rest.starts_with("[hide](") {
+            if let Some(end) = rest[7..].find(')') {
+                rest = &rest[7 + end + 1..];
+                continue;
+            }
+        }
+
+        let ch = rest.chars().next().unwrap();
+        result.push(ch);
+        rest = &rest[ch.len_utf8()..];
+    }
+
+    result
+}
+
 fn handle(req: RpcRequest) -> RpcResponse {
     let id = req.id.unwrap_or(Value::Null);
     match req.method.as_str() {
@@ -112,7 +249,10 @@ fn handle(req: RpcRequest) -> RpcResponse {
         })),
         "notifications/initialized" => RpcResponse { jsonrpc: "2.0", id: None, result: None, error: None },
         "tools/list" => respond(id, serde_json::json!({
-            "tools": [{ "name": "web_search", "inputSchema": input_schema() }]
+            "tools": [
+                { "name": "web_search", "inputSchema": input_schema() },
+                { "name": "web_fetch", "inputSchema": web_fetch_input_schema() }
+            ]
         })),
         "tools/call" => respond(id, handle_call_tool(req.params.as_ref())),
         other => respond_err(id, -32601, format!("method not found: {other}")),
