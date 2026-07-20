@@ -4,7 +4,7 @@ Hard rules and constraints for AI agents working on this project. Read before ma
 
 ## Architecture
 
-- Rust MCP server over stdio using **raw JSON-RPC 2.0** — no MCP SDK crate, no framework.
+- Rust MCP server over stdio using **raw JSON-RPC 2.0** — no MCP SDK crate, no framework (avoids dependency bloat, minimizes binary size and memory consumption).
 - Read newline-delimited JSON from stdin, parse, dispatch, write responses to stdout.
 - **Single-threaded synchronous loop** — no async, no threads, no rayon, no tokio.
 
@@ -50,7 +50,7 @@ Handle exactly these methods:
 }
 ```
 
-No `description` field on any property or on the tool itself.
+No `description` field on any property or on the tool itself — minimizes token usage in the system prompt.
 
 ## Output formatting
 
@@ -63,7 +63,7 @@ No `description` field on any property or on the tool itself.
 
 - Permitted macros: `#[derive(Deserialize)]`, `#[derive(Serialize)]`, `serde_json::json!`.
   No custom `macro_rules!` macros, no proc macros beyond serde derives.
-- Keep `src/main.rs` under 200 lines.
+
 - No `unsafe`, no `extern crate`, no feature gates.
 
 ## Memory & performance
