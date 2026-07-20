@@ -242,7 +242,7 @@ fn handle(req: RpcRequest) -> RpcResponse {
         "initialize" => respond(id, serde_json::json!({
             "protocolVersion": "2025-03-26",
             "capabilities": { "tools": {} },
-            "serverInfo": { "name": "webhands", "version": "1.0.0" }
+            "serverInfo": { "name": "webhands", "version": env!("CARGO_PKG_VERSION") }
         })),
         "notifications/initialized" => RpcResponse { jsonrpc: "2.0", id: None, result: None, error: None },
         "tools/list" => respond(id, serde_json::json!({
