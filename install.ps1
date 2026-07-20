@@ -13,11 +13,11 @@ $Target = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') {
 } else {
     "i686-pc-windows-msvc"; $HtmlTarget = "Windows_i386"
 }
-$Bin = "web_search-${Target}.exe"
+$Bin = "web-${Target}.exe"
 $Url = "https://github.com/${Repo}/releases/download/${Version}/${Bin}"
 
 $InstallDir = Join-Path $env:LOCALAPPDATA "Microsoft" "WindowsApps"
-$OutFile = Join-Path $InstallDir "web_search.exe"
+$OutFile = Join-Path $InstallDir "web.exe"
 
 New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
 

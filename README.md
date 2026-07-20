@@ -1,4 +1,4 @@
-# web search MCP for AI agents — free and unlimited
+# web MCP — free search and fetch for AI agents
 
 Adds ~18 tokens to your system prompt.
 
@@ -16,9 +16,9 @@ powershell -c "irm https://raw.githubusercontent.com/yookibooki/web_search/main/
 
 Installs the binary to:
 
-- **Linux** → `~/.local/bin/web_search`
-- **macOS** → `/usr/local/bin/web_search`
-- **Windows** → `%LOCALAPPDATA%\Microsoft\WindowsApps\web_search.exe`
+- **Linux** → `~/.local/bin/web`
+- **macOS** → `/usr/local/bin/web`
+- **Windows** → `%LOCALAPPDATA%\Microsoft\WindowsApps\web.exe`
 
 ---
 
@@ -26,8 +26,8 @@ Add to your AI tool config:
 ```json
 {
   "mcpServers": {
-    "web_search": {
-      "command": "web_search",
+    "web": {
+      "command": "web",
       "env": { "LANGSEARCH_API_KEY": "<your-api-key>" }
     }
   }

@@ -26,12 +26,12 @@ jobs:
       - name: Build x86_64 (native)
         run: |
           cargo build --release
-          cp target/release/web_search web_search-x86_64-unknown-linux-gnu
+          cp target/release/web web-x86_64-unknown-linux-gnu
 
       - name: Build aarch64 (cross)
         run: |
           cargo build --release --target aarch64-unknown-linux-gnu
-          cp target/aarch64-unknown-linux-gnu/release/web_search web_search-aarch64-unknown-linux-gnu
+          cp target/aarch64-unknown-linux-gnu/release/web web-aarch64-unknown-linux-gnu
         env:
           CC_aarch64_unknown_linux_gnu: aarch64-linux-gnu-gcc
           AR_aarch64_unknown_linux_gnu: aarch64-linux-gnu-ar
@@ -40,7 +40,7 @@ jobs:
       - name: Build i686 (cross)
         run: |
           cargo build --release --target i686-unknown-linux-gnu
-          cp target/i686-unknown-linux-gnu/release/web_search web_search-i686-unknown-linux-gnu
+          cp target/i686-unknown-linux-gnu/release/web web-i686-unknown-linux-gnu
         env:
           CC_i686_unknown_linux_gnu: i686-linux-gnu-gcc
           AR_i686_unknown_linux_gnu: i686-linux-gnu-ar
@@ -49,7 +49,7 @@ jobs:
       - uses: actions/upload-artifact@v7
         with:
           name: linux-binaries
-          path: web_search-*-unknown-linux-gnu
+          path: web-*-unknown-linux-gnu
 
   build-macos:
     runs-on: macos-latest
@@ -65,17 +65,17 @@ jobs:
       - name: Build aarch64 (native)
         run: |
           cargo build --release
-          cp target/release/web_search web_search-aarch64-apple-darwin
+          cp target/release/web web-aarch64-apple-darwin
 
       - name: Build x86_64 (cross)
         run: |
           cargo build --release --target x86_64-apple-darwin
-          cp target/x86_64-apple-darwin/release/web_search web_search-x86_64-apple-darwin
+          cp target/x86_64-apple-darwin/release/web web-x86_64-apple-darwin
 
       - uses: actions/upload-artifact@v7
         with:
           name: macos-binaries
-          path: web_search-*-apple-darwin
+          path: web-*-apple-darwin
 
   build-windows:
     runs-on: windows-latest
@@ -91,22 +91,22 @@ jobs:
       - name: Build x86_64 (native)
         run: |
           cargo build --release
-          cp target/release/web_search.exe web_search-x86_64-pc-windows-msvc.exe
+          cp target/release/web.exe web-x86_64-pc-windows-msvc.exe
 
       - name: Build aarch64 (cross)
         run: |
           cargo build --release --target aarch64-pc-windows-msvc
-          cp target/aarch64-pc-windows-msvc/release/web_search.exe web_search-aarch64-pc-windows-msvc.exe
+          cp target/aarch64-pc-windows-msvc/release/web.exe web-aarch64-pc-windows-msvc.exe
 
       - name: Build i686 (cross)
         run: |
           cargo build --release --target i686-pc-windows-msvc
-          cp target/i686-pc-windows-msvc/release/web_search.exe web_search-i686-pc-windows-msvc.exe
+          cp target/i686-pc-windows-msvc/release/web.exe web-i686-pc-windows-msvc.exe
 
       - uses: actions/upload-artifact@v7
         with:
           name: windows-binaries
-          path: web_search-*-pc-windows-msvc.exe
+          path: web-*-pc-windows-msvc.exe
 
   release:
     needs: [build-linux, build-macos, build-windows]
@@ -119,4 +119,4 @@ jobs:
 
       - uses: softprops/action-gh-release@v3
         with:
-          files: web_search-*
+          files: web-*

@@ -45,12 +45,10 @@ fn input_schema() -> Value {
             "query": { "type": "string" },
             "freshness": {
                 "type": "string",
-                "enum": ["noLimit", "oneDay", "oneWeek", "oneMonth", "oneYear"],
-                "default": "noLimit"
+                "enum": ["noLimit", "oneDay", "oneWeek", "oneMonth", "oneYear"]
             }
         },
-        "required": ["query"],
-        "additionalProperties": false
+        "required": ["query"]
     })
 }
 
@@ -60,8 +58,7 @@ fn web_fetch_input_schema() -> Value {
         "properties": {
             "url": { "type": "string" }
         },
-        "required": ["url"],
-        "additionalProperties": false
+        "required": ["url"]
     })
 }
 
@@ -245,7 +242,7 @@ fn handle(req: RpcRequest) -> RpcResponse {
         "initialize" => respond(id, serde_json::json!({
             "protocolVersion": "2025-03-26",
             "capabilities": { "tools": {} },
-            "serverInfo": { "name": "web_search", "version": "1.0.0" }
+            "serverInfo": { "name": "web", "version": "1.0.0" }
         })),
         "notifications/initialized" => RpcResponse { jsonrpc: "2.0", id: None, result: None, error: None },
         "tools/list" => respond(id, serde_json::json!({

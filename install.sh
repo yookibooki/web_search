@@ -31,22 +31,22 @@ case "$UNAME_S" in
   *) echo "unsupported OS: $UNAME_S" >&2; exit 1 ;;
 esac
 
-BIN="web_search-${TARGET}"
+BIN="web-${TARGET}"
 URL="https://github.com/${REPO}/releases/download/${VERSION}/${BIN}"
 
 mkdir -p "$INSTALL_DIR" 2>/dev/null || true
 
 echo "downloading $BIN $VERSION..."
 if command -v curl >/dev/null 2>&1; then
-  curl -fsSL -o "${INSTALL_DIR}/web_search" "$URL" || {
-    echo "failed to write to ${INSTALL_DIR}/web_search (permission denied)" >&2
-    echo "try: sudo curl -fsSL -o ${INSTALL_DIR}/web_search \"$URL\" && sudo chmod +x ${INSTALL_DIR}/web_search" >&2
+  curl -fsSL -o "${INSTALL_DIR}/web" "$URL" || {
+    echo "failed to write to ${INSTALL_DIR}/web (permission denied)" >&2
+    echo "try: sudo curl -fsSL -o ${INSTALL_DIR}/web \"$URL\" && sudo chmod +x ${INSTALL_DIR}/web" >&2
     exit 1
   }
 elif command -v wget >/dev/null 2>&1; then
-  wget -q -O "${INSTALL_DIR}/web_search" "$URL" || {
-    echo "failed to write to ${INSTALL_DIR}/web_search (permission denied)" >&2
-    echo "try: sudo wget -q -O ${INSTALL_DIR}/web_search \"$URL\" && sudo chmod +x ${INSTALL_DIR}/web_search" >&2
+  wget -q -O "${INSTALL_DIR}/web" "$URL" || {
+    echo "failed to write to ${INSTALL_DIR}/web (permission denied)" >&2
+    echo "try: sudo wget -q -O ${INSTALL_DIR}/web \"$URL\" && sudo chmod +x ${INSTALL_DIR}/web" >&2
     exit 1
   }
 else
@@ -54,8 +54,8 @@ else
   exit 1
 fi
 
-chmod +x "${INSTALL_DIR}/web_search"
-echo "installed to ${INSTALL_DIR}/web_search"
+chmod +x "${INSTALL_DIR}/web"
+echo "installed to ${INSTALL_DIR}/web"
 
 HTML_BIN="html-to-markdown_${HTML2MARKDOWN_VERSION_NO_V}_${HTML_TARGET}.tar.gz"
 HTML_URL="https://github.com/${HTML_REPO}/releases/download/${HTML2MARKDOWN_VERSION}/${HTML_BIN}"
