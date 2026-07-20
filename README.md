@@ -16,9 +16,9 @@ powershell -c "irm https://raw.githubusercontent.com/yookibooki/web_search/main/
 
 Installs the binary to:
 
-- **Linux** → `~/.local/bin/web_search` (in PATH on most distributions)
-- **macOS** → `/usr/local/bin/web_search` (in PATH by default; if permission denied, re-run with `sudo`)
-- **Windows** → `%LOCALAPPDATA%\Microsoft\WindowsApps\web_search.exe` (already in PATH)
+- **Linux** → `~/.local/bin/web_search`
+- **macOS** → `/usr/local/bin/web_search`
+- **Windows** → `%LOCALAPPDATA%\Microsoft\WindowsApps\web_search.exe`
 
 ---
 
