@@ -3,8 +3,14 @@
 $Version = if ($env:VERSION) { $env:VERSION } else { "v0.1.0" }
 $Repo = "yookibooki/web_search"
 
-$Arch = if ([Environment]::Is64BitOperatingSystem) { "x86_64" } else { "i686" }
-$Target = "x86_64-pc-windows-msvc"
+$Target = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') {
+    "aarch64-pc-windows-msvc"
+} elseif ([Environment]::Is64BitOperatingSystem) {
+    "x86_64-pc-windows-msvc"
+} else {
+    Write-Host "unsupported architecture (32-bit)" >&2
+    exit 1
+}
 $Bin = "web_search-${Target}.exe"
 $Url = "https://github.com/${Repo}/releases/download/${Version}/${Bin}"
 

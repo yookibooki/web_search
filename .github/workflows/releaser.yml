@@ -9,43 +9,98 @@ permissions:
   contents: write
 
 jobs:
-  build:
-    strategy:
-      matrix:
-        include:
-          - os: ubuntu-24.04
-            target: x86_64-unknown-linux-gnu
-            ext: ""
-          - os: macos-latest
-            target: aarch64-apple-darwin
-            ext: ""
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-            ext: ".exe"
-    runs-on: ${{ matrix.os }}
+  build-linux:
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 1
 
       - uses: Swatinem/rust-cache@v2
 
-      - run: cargo build --release
+      - name: Install ARM64 cross-toolchain
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq gcc-aarch64-linux-gnu
 
-      - run: cp target/release/web_search${{ matrix.ext }} web_search-${{ matrix.target }}${{ matrix.ext }}
+      - run: rustup target add aarch64-unknown-linux-gnu
 
-      - uses: actions/upload-artifact@v4
+      - name: Build x86_64 (native)
+        run: |
+          cargo build --release
+          cp target/release/web_search web_search-x86_64-unknown-linux-gnu
+
+      - name: Build aarch64 (cross)
+        run: |
+          cargo build --release --target aarch64-unknown-linux-gnu
+          cp target/aarch64-unknown-linux-gnu/release/web_search web_search-aarch64-unknown-linux-gnu
+        env:
+          CC_aarch64_unknown_linux_gnu: aarch64-linux-gnu-gcc
+          AR_aarch64_unknown_linux_gnu: aarch64-linux-gnu-ar
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+
+      - uses: actions/upload-artifact@v7
         with:
-          name: web_search-${{ matrix.target }}
-          path: web_search-${{ matrix.target }}${{ matrix.ext }}
+          name: linux-binaries
+          path: web_search-*-unknown-linux-gnu
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
+      - uses: Swatinem/rust-cache@v2
+
+      - run: rustup target add x86_64-apple-darwin
+
+      - name: Build aarch64 (native)
+        run: |
+          cargo build --release
+          cp target/release/web_search web_search-aarch64-apple-darwin
+
+      - name: Build x86_64 (cross)
+        run: |
+          cargo build --release --target x86_64-apple-darwin
+          cp target/x86_64-apple-darwin/release/web_search web_search-x86_64-apple-darwin
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: macos-binaries
+          path: web_search-*-apple-darwin
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
+      - uses: Swatinem/rust-cache@v2
+
+      - run: rustup target add aarch64-pc-windows-msvc
+
+      - name: Build x86_64 (native)
+        run: |
+          cargo build --release
+          cp target/release/web_search.exe web_search-x86_64-pc-windows-msvc.exe
+
+      - name: Build aarch64 (cross)
+        run: |
+          cargo build --release --target aarch64-pc-windows-msvc
+          cp target/aarch64-pc-windows-msvc/release/web_search.exe web_search-aarch64-pc-windows-msvc.exe
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: windows-binaries
+          path: web_search-*-pc-windows-msvc.exe
 
   release:
-    needs: build
+    needs: [build-linux, build-macos, build-windows]
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
-          pattern: web_search-*
+          pattern: "*-binaries"
           merge-multiple: true
 
       - uses: softprops/action-gh-release@v3

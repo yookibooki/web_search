@@ -93,7 +93,11 @@ No `description` field on any property or on the tool itself.
 ## Release workflow (`.github/workflows/releaser.yml`)
 
 - Trigger: push tag `v*`.
-- Matrix builds on 3 runners: `ubuntu-24.04` (x86_64 Linux), `macos-latest` (aarch64 macOS), `windows-latest` (x86_64 Windows).
+- **3 build jobs** — `build-linux` (ubuntu-24.04), `build-macos` (macos-latest), `build-windows` (windows-latest) — each runs in parallel.
+- Each job builds its **native** target and **cross-compiles** one additional target:
+  - Linux: `x86_64-unknown-linux-gnu` (native) + `aarch64-unknown-linux-gnu` (cross)
+  - macOS: `aarch64-apple-darwin` (native) + `x86_64-apple-darwin` (cross)
+  - Windows: `x86_64-pc-windows-msvc` (native) + `aarch64-pc-windows-msvc` (cross)
 - Uses `Swatinem/rust-cache@v2` for dependency caching.
 - Binary renamed to `web_search-{target}{.ext}` before upload.
 - Separate `release` job collects all artifacts and publishes via `softprops/action-gh-release@v3`.
