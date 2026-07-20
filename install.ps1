@@ -14,7 +14,7 @@ $Target = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') {
 $Bin = "web_search-${Target}.exe"
 $Url = "https://github.com/${Repo}/releases/download/${Version}/${Bin}"
 
-$InstallDir = Join-Path $HOME ".local" "bin"
+$InstallDir = Join-Path $env:LOCALAPPDATA "Microsoft" "WindowsApps"
 $OutFile = Join-Path $InstallDir "web_search.exe"
 
 New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
@@ -24,8 +24,3 @@ Write-Host "downloading $Bin $Version..."
 Invoke-WebRequest -Uri $Url -OutFile $OutFile -UseBasicParsing
 
 Write-Host "installed to $OutFile"
-
-$PathValue = [Environment]::GetEnvironmentVariable("PATH", "User")
-if ($PathValue -notlike "*$InstallDir*") {
-    Write-Host "note: add $InstallDir to PATH"
-}

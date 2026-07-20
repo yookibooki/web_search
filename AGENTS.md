@@ -85,8 +85,10 @@ No `description` field on any property or on the tool itself.
 
 ## Install scripts
 
-- `install.sh` — POSIX sh, detects Linux/macOS + arch, downloads from GitHub releases, installs to `~/.local/bin/web_search`.
-- `install.ps1` — PowerShell, downloads from GitHub releases, installs to `~/.local/bin/web_search.exe`.
+- `install.sh` — POSIX sh, detects Linux/macOS + arch, downloads from GitHub releases.
+  - Linux: installs to `~/.local/bin/web_search`
+  - macOS: installs to `/usr/local/bin/web_search`
+- `install.ps1` — PowerShell, detects Windows arch, downloads from GitHub releases, installs to `%LOCALAPPDATA%\Microsoft\WindowsApps\web_search.exe` (already in PATH).
 - Both accept `VERSION` env var (defaults to `v0.1.0`).
 - Download URL pattern: `https://github.com/yookibooki/web_search/releases/download/${VERSION}/web_search-${TARGET}`.
 

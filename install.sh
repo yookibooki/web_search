@@ -9,6 +9,7 @@ UNAME_M=$(uname -m)
 
 case "$UNAME_S" in
   Linux)
+    INSTALL_DIR="${HOME}/.local/bin"
     case "$UNAME_M" in
       x86_64) TARGET="x86_64-unknown-linux-gnu" ;;
       aarch64|arm64) TARGET="aarch64-unknown-linux-gnu" ;;
@@ -16,6 +17,7 @@ case "$UNAME_S" in
     esac
     ;;
   Darwin)
+    INSTALL_DIR="/usr/local/bin"
     case "$UNAME_M" in
       x86_64) TARGET="x86_64-apple-darwin" ;;
       arm64)  TARGET="aarch64-apple-darwin" ;;
@@ -27,15 +29,22 @@ esac
 
 BIN="web_search-${TARGET}"
 URL="https://github.com/${REPO}/releases/download/${VERSION}/${BIN}"
-INSTALL_DIR="${HOME}/.local/bin"
 
-mkdir -p "$INSTALL_DIR"
+mkdir -p "$INSTALL_DIR" 2>/dev/null || true
 
 echo "downloading $BIN $VERSION..."
 if command -v curl >/dev/null 2>&1; then
-  curl -fsSL -o "${INSTALL_DIR}/web_search" "$URL"
+  curl -fsSL -o "${INSTALL_DIR}/web_search" "$URL" || {
+    echo "failed to write to ${INSTALL_DIR}/web_search (permission denied)" >&2
+    echo "try: sudo curl -fsSL -o ${INSTALL_DIR}/web_search \"$URL\" && sudo chmod +x ${INSTALL_DIR}/web_search" >&2
+    exit 1
+  }
 elif command -v wget >/dev/null 2>&1; then
-  wget -q -O "${INSTALL_DIR}/web_search" "$URL"
+  wget -q -O "${INSTALL_DIR}/web_search" "$URL" || {
+    echo "failed to write to ${INSTALL_DIR}/web_search (permission denied)" >&2
+    echo "try: sudo wget -q -O ${INSTALL_DIR}/web_search \"$URL\" && sudo chmod +x ${INSTALL_DIR}/web_search" >&2
+    exit 1
+  }
 else
   echo "need curl or wget" >&2
   exit 1
