@@ -1,10 +1,7 @@
 #!/bin/sh
 set -eu
 
-VERSION="${VERSION:-v0.1.0}"
-HTML2MARKDOWN_VERSION="${HTML2MARKDOWN_VERSION:-v2.5.2}"
-HTML2MARKDOWN_VERSION_NO_V="${HTML2MARKDOWN_VERSION#v}"
-REPO="yookibooki/web_search"
+REPO="yookibooki/webhands"
 HTML_REPO="JohannesKaufmann/html-to-markdown"
 
 UNAME_S=$(uname -s)
@@ -31,22 +28,23 @@ case "$UNAME_S" in
   *) echo "unsupported OS: $UNAME_S" >&2; exit 1 ;;
 esac
 
-BIN="web-${TARGET}"
-URL="https://github.com/${REPO}/releases/download/${VERSION}/${BIN}"
+WEB_URL="https://github.com/${REPO}/releases/latest/download/webhands-${TARGET}"
+HTML_BIN="html-to-markdown_${HTML_TARGET}.tar.gz"
+HTML_URL="https://github.com/${HTML_REPO}/releases/latest/download/${HTML_BIN}"
 
 mkdir -p "$INSTALL_DIR" 2>/dev/null || true
 
-echo "downloading $BIN $VERSION..."
+echo "downloading webhands..."
 if command -v curl >/dev/null 2>&1; then
-  curl -fsSL -o "${INSTALL_DIR}/web" "$URL" || {
-    echo "failed to write to ${INSTALL_DIR}/web (permission denied)" >&2
-    echo "try: sudo curl -fsSL -o ${INSTALL_DIR}/web \"$URL\" && sudo chmod +x ${INSTALL_DIR}/web" >&2
+  curl -fsSL -o "${INSTALL_DIR}/webhands" "$WEB_URL" || {
+    echo "failed to write to ${INSTALL_DIR}/webhands (permission denied)" >&2
+    echo "try: sudo curl -fsSL -o ${INSTALL_DIR}/webhands \"$WEB_URL\" && sudo chmod +x ${INSTALL_DIR}/webhands" >&2
     exit 1
   }
 elif command -v wget >/dev/null 2>&1; then
-  wget -q -O "${INSTALL_DIR}/web" "$URL" || {
-    echo "failed to write to ${INSTALL_DIR}/web (permission denied)" >&2
-    echo "try: sudo wget -q -O ${INSTALL_DIR}/web \"$URL\" && sudo chmod +x ${INSTALL_DIR}/web" >&2
+  wget -q -O "${INSTALL_DIR}/webhands" "$WEB_URL" || {
+    echo "failed to write to ${INSTALL_DIR}/webhands (permission denied)" >&2
+    echo "try: sudo wget -q -O ${INSTALL_DIR}/webhands \"$WEB_URL\" && sudo chmod +x ${INSTALL_DIR}/webhands" >&2
     exit 1
   }
 else
@@ -54,13 +52,10 @@ else
   exit 1
 fi
 
-chmod +x "${INSTALL_DIR}/web"
-echo "installed to ${INSTALL_DIR}/web"
+chmod +x "${INSTALL_DIR}/webhands"
+echo "installed to ${INSTALL_DIR}/webhands"
 
-HTML_BIN="html-to-markdown_${HTML2MARKDOWN_VERSION_NO_V}_${HTML_TARGET}.tar.gz"
-HTML_URL="https://github.com/${HTML_REPO}/releases/download/${HTML2MARKDOWN_VERSION}/${HTML_BIN}"
-
-echo "downloading html2markdown ${HTML2MARKDOWN_VERSION}..."
+echo "downloading html2markdown..."
 TMPDIR=$(mktemp -d 2>/dev/null || mktemp -d -t html2markdown)
 if command -v curl >/dev/null 2>&1; then
   curl -fsSL -o "${TMPDIR}/${HTML_BIN}" "$HTML_URL" || {

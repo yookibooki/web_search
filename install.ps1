@@ -1,9 +1,6 @@
 #!/usr/bin/env pwsh
 
-$Version = if ($env:VERSION) { $env:VERSION } else { "v0.1.0" }
-$HtmlVersion = if ($env:HTML2MARKDOWN_VERSION) { $env:HTML2MARKDOWN_VERSION } else { "v2.5.2" }
-$HtmlVersionNoV = $HtmlVersion.TrimStart('v')
-$Repo = "yookibooki/web_search"
+$Repo = "yookibooki/webhands"
 $HtmlRepo = "JohannesKaufmann/html-to-markdown"
 
 $Target = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') {
@@ -13,26 +10,28 @@ $Target = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') {
 } else {
     "i686-pc-windows-msvc"; $HtmlTarget = "Windows_i386"
 }
-$Bin = "web-${Target}.exe"
-$Url = "https://github.com/${Repo}/releases/download/${Version}/${Bin}"
+
+$Bin = "webhands-${Target}.exe"
+$Url = "https://github.com/${Repo}/releases/latest/download/${Bin}"
+
+$HtmlAsset = "html-to-markdown_${HtmlTarget}.zip"
+$HtmlUrl = "https://github.com/${HtmlRepo}/releases/latest/download/${HtmlAsset}"
 
 $InstallDir = Join-Path $env:LOCALAPPDATA "Microsoft" "WindowsApps"
-$OutFile = Join-Path $InstallDir "web.exe"
+$OutFile = Join-Path $InstallDir "webhands.exe"
 
 New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
 
-Write-Host "downloading $Bin $Version..."
+Write-Host "downloading webhands..."
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 Invoke-WebRequest -Uri $Url -OutFile $OutFile -UseBasicParsing
 
 Write-Host "installed to $OutFile"
 
-$HtmlAsset = "html-to-markdown_${HtmlVersionNoV}_${HtmlTarget}.zip"
-$HtmlUrl = "https://github.com/${HtmlRepo}/releases/download/${HtmlVersion}/${HtmlAsset}"
 $HtmlZip = Join-Path $env:TMP "html2markdown.zip"
 $HtmlOutFile = Join-Path $InstallDir "html2markdown.exe"
 
-Write-Host "downloading html2markdown ${HtmlVersion}..."
+Write-Host "downloading html2markdown..."
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 Invoke-WebRequest -Uri $HtmlUrl -OutFile $HtmlZip -UseBasicParsing
 

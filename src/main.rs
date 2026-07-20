@@ -52,7 +52,7 @@ fn input_schema() -> Value {
     })
 }
 
-fn web_fetch_input_schema() -> Value {
+fn fetch_input_schema() -> Value {
     serde_json::json!({
         "type": "object",
         "properties": {
@@ -81,8 +81,8 @@ fn handle_call_tool(params: Option<&Value>) -> Value {
         None => return serde_json::json!({"isError": true, "content": [{"type": "text", "text": "invalid params"}]}),
     };
     match call.name.as_str() {
-        "web_search" => handle_web_search(call.arguments),
-        "web_fetch" => handle_web_fetch(call.arguments),
+        "WebSearch" => handle_search(call.arguments),
+        "WebFetch" => handle_fetch(call.arguments),
         _ => {
             let msg = format!("unknown tool: {}", call.name);
             serde_json::json!({"isError": true, "content": [{"type": "text", "text": msg}]})
@@ -90,7 +90,7 @@ fn handle_call_tool(params: Option<&Value>) -> Value {
     }
 }
 
-fn handle_web_search(arguments: Option<Value>) -> Value {
+fn handle_search(arguments: Option<Value>) -> Value {
     let search: SearchArgs = arguments.and_then(|a| serde_json::from_value(a).ok())
         .unwrap_or(SearchArgs { query: String::new(), freshness: None });
     let freshness = search.freshness.unwrap_or_else(|| "noLimit".to_string());
@@ -121,7 +121,7 @@ fn handle_web_search(arguments: Option<Value>) -> Value {
     serde_json::json!({ "content": [{"type": "text", "text": lines.join("\n")}] })
 }
 
-fn handle_web_fetch(arguments: Option<Value>) -> Value {
+fn handle_fetch(arguments: Option<Value>) -> Value {
     let fetch: FetchArgs = match arguments.and_then(|a| serde_json::from_value(a).ok()) {
         Some(f) => f,
         None => return serde_json::json!({"isError": true, "content": [{"type": "text", "text": "invalid params"}]}),
@@ -242,13 +242,13 @@ fn handle(req: RpcRequest) -> RpcResponse {
         "initialize" => respond(id, serde_json::json!({
             "protocolVersion": "2025-03-26",
             "capabilities": { "tools": {} },
-            "serverInfo": { "name": "web", "version": "1.0.0" }
+            "serverInfo": { "name": "webhands", "version": "1.0.0" }
         })),
         "notifications/initialized" => RpcResponse { jsonrpc: "2.0", id: None, result: None, error: None },
         "tools/list" => respond(id, serde_json::json!({
             "tools": [
-                { "name": "web_search", "inputSchema": input_schema() },
-                { "name": "web_fetch", "inputSchema": web_fetch_input_schema() }
+                { "name": "WebSearch", "inputSchema": input_schema() },
+                { "name": "WebFetch", "inputSchema": fetch_input_schema() }
             ]
         })),
         "tools/call" => respond(id, handle_call_tool(req.params.as_ref())),

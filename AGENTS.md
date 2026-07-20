@@ -1,4 +1,4 @@
-# web — AGENTS.md
+# WebHands — AGENTS.md
 
 Hard rules and constraints for AI agents working on this project. Read before making any changes.
 
@@ -16,8 +16,8 @@ Everything else must come from `std` — no `reqwest`, no `anyhow`, no `thiserro
 ## HTTP calls
 
 - **Must** use `std::process::Command` to spawn `curl`. Never add an HTTP crate.
-- **`web_search` tool**: `-s -X POST https://api.langsearch.com/v1/web-search -H "Authorization: Bearer $LANGSEARCH_API_KEY" -H "Content-Type: application/json" -d '{...}' --max-time 30`
-- **`web_fetch` tool**: `curl --no-progress-meter -L --max-time 30 <url>` piped into `html2markdown --domain=<url> --plugin-table --opt-table-header-promotion --opt-table-cell-padding-behavior minimal --opt-table-skip-empty-rows` then post-processed in Rust (strip `[]()` empty links, `[hide]()` links, collapse blank lines).
+- **`WebSearch` tool**: `-s -X POST https://api.langsearch.com/v1/web-search -H "Authorization: Bearer $LANGSEARCH_API_KEY" -H "Content-Type: application/json" -d '{...}' --max-time 30`
+- **`WebFetch` tool**: `curl --no-progress-meter -L --max-time 30 <url>` piped into `html2markdown --domain=<url> --plugin-table --opt-table-header-promotion --opt-table-cell-padding-behavior minimal --opt-table-skip-empty-rows` then post-processed in Rust (strip `[]()` empty links, `[hide]()` links, collapse blank lines).
 - API key from `LANGSEARCH_API_KEY` environment variable.
 - `html2markdown` is a system binary (Go-based HTML-to-Markdown converter) installed alongside `web`. Not a Rust crate.
 - If `curl` fails or returns non-JSON → `isError: true` with error text.
@@ -28,13 +28,13 @@ Handle exactly these methods:
 
 | Method | Response |
 |---|---|
-| `initialize` | `{"protocolVersion":"2025-03-26","capabilities":{"tools":{}},"serverInfo":{"name":"web","version":"1.0.0"}}` |
+| `initialize` | `{"protocolVersion":"2025-03-26","capabilities":{"tools":{}},"serverInfo":{"name":"webhands","version":"1.0.0"}}` |
 | `notifications/initialized` | No response (skip if `id` is `None`) |
-| `tools/list` | Two tools `web_search` and `web_fetch` with `inputSchema` — no `description` fields anywhere |
+| `tools/list` | Two tools `WebSearch` and `WebFetch` with `inputSchema` — no `description` fields anywhere |
 | `tools/call` | Validate tool name, dispatch to search or fetch, return results |
 | anything else | JSON-RPC error `-32601` "method not found" |
 
-### Tool schema (`web_search`)
+### Tool schema (`WebSearch`)
 
 ```json
 {
@@ -52,7 +52,7 @@ Handle exactly these methods:
 
 No `description` field on any property or on the tool itself — minimizes token usage in the system prompt.
 
-### Tool schema (`web_fetch`)
+### Tool schema (`WebFetch`)
 
 ```json
 {
@@ -89,7 +89,7 @@ No `description` fields. Same rule applies.
 ## Build & config
 
 - Build: `cargo build --release` (profile in `Cargo.toml` already sets `opt-level = "z"`, `lto = true`, `codegen-units = 1`, `strip = true`).
-- Binary: `target/release/web`.
+- Binary: `target/release/webhands`.
 - Always strip the binary after build (already done by profile).
 
 ## Testing
@@ -100,16 +100,16 @@ No `description` fields. Same rule applies.
 ## Install scripts
 
 - `install.sh` — POSIX sh, detects Linux/macOS + arch, downloads from GitHub releases.
-  - Linux: installs to `~/.local/bin/web`
-  - macOS: installs to `/usr/local/bin/web`
+  - Linux: installs to `~/.local/bin/webhands`
+  - macOS: installs to `/usr/local/bin/webhands`
   - Supports x86_64, aarch64/arm64, i686/i386 on Linux; x86_64 and arm64 on macOS.
-- `install.ps1` — PowerShell, detects Windows arch, downloads from GitHub releases, installs to `%LOCALAPPDATA%\Microsoft\WindowsApps\web.exe` (already in PATH).
+- `install.ps1` — PowerShell, detects Windows arch, downloads from GitHub releases, installs to `%LOCALAPPDATA%\Microsoft\WindowsApps\webhands.exe` (already in PATH).
   - Supports x86_64, ARM64, i686/i386.
-- Both scripts also download and extract `html2markdown` binary from `JohannesKaufmann/html-to-markdown` releases alongside `web`.
-- Both accept `VERSION` env var (defaults to `v0.1.0`) and `HTML2MARKDOWN_VERSION` env var (defaults to `v2.5.2`).
+- Both scripts also download and extract the `html2markdown` binary from `JohannesKaufmann/html-to-markdown` alongside `webhands`.
+- Both download from the GitHub `releases/latest/download` endpoint — no version is hardcoded and no API call is made.
 - Download URL patterns:
-  - `https://github.com/yookibooki/web_search/releases/download/${VERSION}/web-${TARGET}`
-  - `https://github.com/JohannesKaufmann/html-to-markdown/releases/download/${HTML2MARKDOWN_VERSION}/html-to-markdown_${VERSION_NO_V}_${HTML_TARGET}.tar.gz` (`.zip` on Windows)
+  - `https://github.com/yookibooki/webhands/releases/latest/download/webhands-${TARGET}`
+  - `https://github.com/JohannesKaufmann/html-to-markdown/releases/latest/download/html-to-markdown_${HTML_TARGET}.tar.gz` (`.zip` on Windows)
 
 ## Release workflow (`.github/workflows/releaser.yml`)
 
@@ -120,7 +120,7 @@ No `description` fields. Same rule applies.
   - macOS: `aarch64-apple-darwin` (native) + `x86_64-apple-darwin` (cross)
   - Windows: `x86_64-pc-windows-msvc` (native) + `aarch64-pc-windows-msvc` + `i686-pc-windows-msvc` (cross)
 - Uses `Swatinem/rust-cache@v2` for dependency caching.
-- Binary renamed to `web-{target}{.ext}` before upload.
+- Binary renamed to `webhands-{target}{.ext}` before upload.
 - Separate `release` job collects all artifacts and publishes via `softprops/action-gh-release@v3`.
 
 ## Prohibited changes
