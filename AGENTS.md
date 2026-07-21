@@ -10,17 +10,17 @@ Hard rules and constraints for AI agents working on this project. Read before ma
 
 ## Dependencies
 
-Only ever add these crates: `serde` (with `derive` feature) and `serde_json`.
+Only ever add these crates: `serde` (with `derive` feature), `serde_json`, and `ureq`.
 Everything else must come from `std` — no `reqwest`, no `anyhow`, no `thiserror`, no `clap`, no nothing.
 
 ## HTTP calls
 
-- **Must** use `std::process::Command` to spawn `curl`. Never add an HTTP crate.
-- **`WebSearch` tool**: `-s -X POST https://api.langsearch.com/v1/web-search -H "Authorization: Bearer $LANGSEARCH_API_KEY" -H "Content-Type: application/json" -d '{...}' --max-time 30`
-- **`WebFetch` tool**: `curl --no-progress-meter -L --max-time 30 <url>` piped into `html2markdown --domain=<url> --plugin-table --opt-table-header-promotion --opt-table-cell-padding-behavior minimal --opt-table-skip-empty-rows` then post-processed in Rust (strip `[]()` empty links, `[hide]()` links, collapse blank lines).
+- **Must** use `ureq` crate with a shared `Agent` (configured with 30s global timeout via `OnceLock`). Never use `std::process::Command` for HTTP.
+- **`WebSearch` tool**: `POST https://api.langsearch.com/v1/web-search` with `Authorization: Bearer $LANGSEARCH_API_KEY` and `Content-Type: application/json`, body `{"query": "...", "freshness": "..."}`. Use `.send_json()` and `.into_json()`.
+- **`WebFetch` tool**: `GET <url>` via `ureq`, then pipe the HTML string into `html2markdown --domain=<url> --plugin-table --opt-table-header-promotion --opt-table-cell-padding-behavior minimal --opt-table-skip-empty-rows` via child process stdin, then post-process in Rust (strip `[]()` empty links, `[hide]()` links, collapse blank lines).
 - API key from `LANGSEARCH_API_KEY` environment variable.
-- `html2markdown` is a system binary (Go-based HTML-to-Markdown converter) installed alongside `web`. Not a Rust crate.
-- If `curl` fails or returns non-JSON → `isError: true` with error text.
+- `html2markdown` is a system binary (Go-based HTML-to-Markdown converter) installed alongside `webhands`. Not a Rust crate.
+- If `ureq` fails or returns non-JSON → `isError: true` with error text.
 
 ## MCP protocol
 
@@ -84,7 +84,7 @@ No `description` fields. Same rule applies.
 
 - No GC, no runtime — Rust handles this.
 - Keep the process lean: minimal allocations, no leaking, no extra threads.
-- HTTP/TLS/DNS memory lives in the `curl` subprocess and is reclaimed when it exits.
+- HTTP/TLS/DNS is handled in-process by `ureq` (pure Rust, no subprocess overhead).
 
 ## Build & config
 
@@ -125,7 +125,6 @@ No `description` fields. Same rule applies.
 
 ## Prohibited changes
 
-- Do not add any HTTP client crate (reqwest, ureq, etc.).
 - Do not add async runtime, threads, or tokio.
 - Do not add MCP SDK or any framework.
 - Do not add `description` fields to the tool schema.
@@ -133,3 +132,4 @@ No `description` fields. Same rule applies.
 - Do not switch to a different API endpoint.
 - Do not add optional dependencies or feature flags.
 - Do not replace `html2markdown` with a Rust crate — it must remain a system binary invoked via `Command`.
+- Do not use `std::process::Command` for HTTP — use `ureq` instead.

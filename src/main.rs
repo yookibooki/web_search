@@ -2,6 +2,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::io::{self, BufRead, Write};
 use std::process::{Command, Stdio};
+use std::sync::OnceLock;
+use std::time::Duration;
 
 #[derive(Deserialize)]
 struct RpcRequest { id: Option<Value>, method: String, #[serde(default)] params: Option<Value> }
@@ -75,6 +77,17 @@ fn respond_err(id: Value, code: i32, msg: String) -> RpcResponse {
     RpcResponse { jsonrpc: "2.0", id: Some(id), result: None, error: Some(RpcError { code, message: msg }) }
 }
 
+fn http_agent() -> &'static ureq::Agent {
+    static AGENT: OnceLock<ureq::Agent> = OnceLock::new();
+    AGENT.get_or_init(|| {
+        ureq::Agent::new_with_config(
+            ureq::config::Config::builder()
+                .timeout_global(Some(Duration::from_secs(30)))
+                .build(),
+        )
+    })
+}
+
 fn handle_call_tool(params: Option<&Value>) -> Value {
     let call: ToolCallParams = match params.and_then(|p| serde_json::from_value(p.clone()).ok()) {
         Some(p) => p,
@@ -97,22 +110,18 @@ fn handle_search(arguments: Option<Value>) -> Value {
     let api_key = std::env::var("LANGSEARCH_API_KEY").unwrap_or_default();
     let body = serde_json::json!({ "query": search.query, "freshness": freshness });
 
-    let output = match Command::new("curl").arg("-s").arg("-X").arg("POST")
-        .arg("https://api.langsearch.com/v1/web-search")
-        .arg("-H").arg(format!("Authorization: Bearer {}", api_key))
-        .arg("-H").arg("Content-Type: application/json")
-        .arg("-d").arg(body.to_string())
-        .arg("--max-time").arg("30").output()
+    let response = match http_agent()
+        .post("https://api.langsearch.com/v1/web-search")
+        .header("Authorization", &format!("Bearer {}", api_key))
+        .header("Content-Type", "application/json")
+        .send_json(&body)
     {
-        Ok(o) => o,
+        Ok(r) => r,
         Err(e) => return serde_json::json!({"isError": true, "content": [{"type": "text", "text": e.to_string()}]}),
     };
-    if !output.status.success() {
-        return serde_json::json!({"isError": true, "content": [{"type": "text", "text": String::from_utf8_lossy(&output.stderr).into_owned()}]});
-    }
-    let api: ApiResponse = match serde_json::from_slice(&output.stdout) {
+    let api: ApiResponse = match response.into_body().read_json() {
         Ok(r) => r,
-        Err(e) => return serde_json::json!({"isError": true, "content": [{"type": "text", "text": format!("{e}: {}", String::from_utf8_lossy(&output.stdout))}]}),
+        Err(e) => return serde_json::json!({"isError": true, "content": [{"type": "text", "text": e.to_string()}]}),
     };
     let mut lines: Vec<String> = Vec::new();
     for item in &api.data.web_pages.value {
@@ -128,8 +137,25 @@ fn handle_fetch(arguments: Option<Value>) -> Value {
     };
     let url = fetch.url;
 
-    let mut curl = match Command::new("curl")
-        .args(["--no-progress-meter", "-L", "--max-time", "30", &url])
+    // Fetch HTML with ureq (in-process, no curl subprocess)
+    let html = match http_agent().get(&url).call() {
+        Ok(r) => match r.into_body().read_to_string() {
+            Ok(s) => s,
+            Err(e) => return serde_json::json!({"isError": true, "content": [{"type": "text", "text": e.to_string()}]}),
+        },
+        Err(e) => return serde_json::json!({"isError": true, "content": [{"type": "text", "text": e.to_string()}]}),
+    };
+
+    // Pipe through html2markdown
+    let mut child = match Command::new("html2markdown")
+        .args([
+            "--domain", &url,
+            "--plugin-table",
+            "--opt-table-header-promotion",
+            "--opt-table-cell-padding-behavior", "minimal",
+            "--opt-table-skip-empty-rows",
+        ])
+        .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
@@ -138,39 +164,15 @@ fn handle_fetch(arguments: Option<Value>) -> Value {
         Err(e) => return serde_json::json!({"isError": true, "content": [{"type": "text", "text": e.to_string()}]}),
     };
 
-    let curl_stdout = curl.stdout.take().unwrap();
+    // Write HTML to html2markdown's stdin and close
+    if let Err(e) = child.stdin.take().unwrap().write_all(html.as_bytes()) {
+        return serde_json::json!({"isError": true, "content": [{"type": "text", "text": e.to_string()}]});
+    }
 
-    let html2md = match Command::new("html2markdown")
-        .args([
-            "--domain", &url,
-            "--plugin-table",
-            "--opt-table-header-promotion",
-            "--opt-table-cell-padding-behavior", "minimal",
-            "--opt-table-skip-empty-rows",
-        ])
-        .stdin(curl_stdout)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-    {
-        Ok(h) => h,
-        Err(e) => return serde_json::json!({"isError": true, "content": [{"type": "text", "text": e.to_string()}]}),
-    };
-
-    let output = match html2md.wait_with_output() {
+    let output = match child.wait_with_output() {
         Ok(o) => o,
         Err(e) => return serde_json::json!({"isError": true, "content": [{"type": "text", "text": e.to_string()}]}),
     };
-
-    let curl_ok = match curl.wait() {
-        Ok(s) => s.success(),
-        Err(_) => false,
-    };
-    if !curl_ok {
-        let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
-        let msg = if stderr.is_empty() { "curl request failed".to_string() } else { stderr };
-        return serde_json::json!({"isError": true, "content": [{"type": "text", "text": msg}]});
-    }
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
